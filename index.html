@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Survivor 50 Fantasy Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Crimson+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0c0f;color:#e8e0d4;font-family:'Crimson Pro','Georgia',serif;-webkit-font-smoothing:antialiased}
+input,select,button{font-family:inherit}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.0/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const IS_ADMIN = new URLSearchParams(window.location.search).has("admin");
+
+const SURVIVORS = [
+  { name: "Christian Hubicki", tribe: "Cila", season: "S37", color: "#E8751A" },
+  { name: "Cirie Fields", tribe: "Cila", season: "S12/16/20/34", color: "#E8751A" },
+  { name: "Ozzy Lusth", tribe: "Cila", season: "S13/16/23/34", color: "#E8751A" },
+  { name: "Rick Devens", tribe: "Cila", season: "S38", color: "#E8751A" },
+  { name: "Emily Flippen", tribe: "Cila", season: "S45", color: "#E8751A" },
+  { name: "Jenna Lewis-Dougherty", tribe: "Cila", season: "S1/8", color: "#E8751A" },
+  { name: "Joe Hunter", tribe: "Cila", season: "S48", color: "#E8751A" },
+  { name: "Savannah Louie", tribe: "Cila", season: "S49", color: "#E8751A" },
+  { name: "Charlie Davis", tribe: "Kalo", season: "S46", color: "#2A9D8F" },
+  { name: "Tiffany Ervin", tribe: "Kalo", season: "S46", color: "#2A9D8F" },
+  { name: 'Benjamin "Coach" Wade', tribe: "Kalo", season: "S18/20/23", color: "#2A9D8F" },
+  { name: "Jonathan Young", tribe: "Kalo", season: "S42", color: "#2A9D8F" },
+  { name: "Mike White", tribe: "Kalo", season: "S37", color: "#2A9D8F" },
+  { name: "Chrissy Hofbeck", tribe: "Kalo", season: "S35", color: "#2A9D8F" },
+  { name: "Kamilla Karthigesu", tribe: "Kalo", season: "S48", color: "#2A9D8F" },
+  { name: "Dee Valladares", tribe: "Kalo", season: "S45", color: "#2A9D8F" },
+  { name: "Colby Donaldson", tribe: "Vatu", season: "S2/8/20", color: "#D64080" },
+  { name: "Kyle Fraser", tribe: "Vatu", season: "S48", color: "#D64080" },
+  { name: "Q Burdette", tribe: "Vatu", season: "S46", color: "#D64080" },
+  { name: "Rizo Velovic", tribe: "Vatu", season: "S49", color: "#D64080" },
+  { name: "Angelina Keeley", tribe: "Vatu", season: "S37", color: "#D64080" },
+  { name: "Aubry Bracco", tribe: "Vatu", season: "S32/34/38", color: "#D64080" },
+  { name: "Genevieve Mushaluk", tribe: "Vatu", season: "S47", color: "#D64080" },
+  { name: "Stephenie LaGrossa Kendrick", tribe: "Vatu", season: "S10/11/20", color: "#D64080" },
+];
+
+const SCORING_EVENTS = [
+  { key: "reward", label: "Reward Challenge Win", points: 1, icon: "🏆" },
+  { key: "immunity", label: "Immunity Challenge Win", points: 2, icon: "🛡️" },
+  { key: "island", label: "Island Challenge", points: 1, icon: "🏝️" },
+  { key: "treeMail", label: "Read Tree Mail", points: 1, icon: "📜" },
+  { key: "fire", label: "Make Fire", points: 1, icon: "🔥" },
+  { key: "clue", label: "Find a Clue", points: 1, icon: "🔍" },
+  { key: "merge", label: "Merge", points: 1, icon: "🤝" },
+  { key: "findIdol", label: "Find an Idol", points: 1, icon: "⭐" },
+  { key: "playIdol", label: "Idol Played on Them", points: 1, icon: "✨" },
+  { key: "advantage", label: "Gain Advantage", points: 1, icon: "🎯" },
+];
+
+const INDIVIDUAL_EVENTS = SCORING_EVENTS.filter(e => !["reward","immunity"].includes(e.key));
+const MAX_VOTE_POINTS = 10;
+const TRIBES = ["Cila", "Kalo", "Vatu"];
+
+function tc(t){return t==="Cila"?"#E8751A":t==="Kalo"?"#2A9D8F":t==="Vatu"?"#D64080":"#888"}
+function tb(t){return t==="Cila"?"rgba(232,117,26,0.12)":t==="Kalo"?"rgba(42,157,143,0.12)":t==="Vatu"?"rgba(214,64,128,0.12)":"rgba(136,136,136,0.08)"}
+
+const DEFAULT = () => ({
+  phase: "setup",
+  players: [
+    { name: "", drafted: [], winnerPick: null, winnerHistory: [] },
+    { name: "", drafted: [], winnerPick: null, winnerHistory: [] },
+    { name: "", drafted: [], winnerPick: null, winnerHistory: [] },
+  ],
+  currentEpisode: 1,
+  episodes: [],
+  eliminatedSurvivors: [],
+  eliminationEpisodes: {},
+});
+
+function normalize(d) {
+  if (!d) return DEFAULT();
+  return {
+    ...DEFAULT(), ...d,
+    players: (d.players||[]).map(p => ({...DEFAULT().players[0],...(p||{}),drafted:p?.drafted||[],winnerHistory:p?.winnerHistory||[]})),
+    episodes: d.episodes||[], eliminatedSurvivors: d.eliminatedSurvivors||[], eliminationEpisodes: d.eliminationEpisodes||{},
+  };
+}
+
+// ─── SCORES ───
+function calcScores(state) {
+  return (state.players||[]).map((p, pi) => {
+    let surv=0, vote=0, bonus=0;
+    (state.episodes||[]).forEach(ep => {
+      if(ep.events)(p.drafted||[]).forEach(s=>{const e=ep.events[s]||{};SCORING_EVENTS.forEach(se=>{if(e[se.key])surv+=se.points*e[se.key]});});
+      if(ep.votes&&ep.votes[pi]&&ep.votedOut)(ep.votedOut||[]).forEach(vo=>{if(ep.votes[pi][vo])vote+=ep.votes[pi][vo]});
+    });
+    let streak=0; const h=p.winnerHistory||[];
+    for(let i=h.length-1;i>=0;i--){if(h[i]===p.winnerPick)streak++;else break;}
+    return { name:p.name, surv, vote, bonus, streak, total:surv+vote+bonus };
+  });
+}
+
+// ─── DOWNLOAD HELPER ───
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ═══════════════════════════════════════
+// APP
+// ═══════════════════════════════════════
+function App() {
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("standings");
+  const [draftStep, setDraftStep] = useState(0);
+  const [notification, setNotification] = useState(null);
+
+  // Load: try fetch data.json, fallback to localStorage, fallback to default
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("data.json?_=" + Date.now());
+        if (res.ok) {
+          const d = await res.json();
+          const s = normalize(d);
+          setState(s);
+          if (IS_ADMIN) localStorage.setItem("s50", JSON.stringify(s));
+          setLoading(false);
+          return;
+        }
+      } catch {}
+      // Fallback to localStorage (admin only)
+      if (IS_ADMIN) {
+        try {
+          const ls = localStorage.getItem("s50");
+          if (ls) { setState(normalize(JSON.parse(ls))); setLoading(false); return; }
+        } catch {}
+      }
+      setState(DEFAULT());
+      setLoading(false);
+    })();
+  }, []);
+
+  const save = useCallback((s) => {
+    setState(s);
+    if (IS_ADMIN) localStorage.setItem("s50", JSON.stringify(s));
+  }, []);
+
+  const notify = (m) => { setNotification(m); setTimeout(()=>setNotification(null),3000); };
+
+  const publish = () => {
+    downloadJSON(state, "data.json");
+    notify("📥 data.json downloaded! Commit it to your repo.");
+  };
+
+  if (loading||!state) return (
+    <div style={S.loadingScreen}>
+      <div style={{fontSize:56,animation:"pulse 1.5s infinite"}}>🔥</div>
+      <div style={{color:"#e8e0d4",fontSize:18,marginTop:16,letterSpacing:2}}>Loading Tribal Council...</div>
+    </div>
+  );
+
+  // Non-admin viewing setup phase = waiting screen
+  if (!IS_ADMIN && state.phase === "setup") return (
+    <div style={S.container}>
+      <div style={S.setupHero}>
+        <div style={S.heroFire}>🔥</div>
+        <h1 style={S.heroTitle}>SURVIVOR 50</h1>
+        <div style={S.heroSubtitle}>FANTASY GAME</div>
+        <div style={S.heroSeason}>In the Hands of the Fans</div>
+      </div>
+      <div style={S.setupCard}>
+        <h2 style={S.setupHeading}>Game Not Started Yet</h2>
+        <p style={S.setupDesc}>The game commissioner is still setting up the draft. Check back soon!</p>
+      </div>
+    </div>
+  );
+
+  // Admin setup
+  if (IS_ADMIN && state.phase === "setup") {
+    return <SetupScreen state={state} save={save} notify={notify} publish={publish}
+      draftStep={draftStep} setDraftStep={setDraftStep} notification={notification} />;
+  }
+
+  // ─── MAIN GAME ───
+  const adminTabs = [
+    { key:"standings", label:"Scores", icon:"📊" },
+    { key:"score", label:"Score Ep", icon:"✏️" },
+    { key:"winner", label:"Winner", icon:"⭐" },
+    { key:"drafts", label:"Drafts", icon:"👥" },
+    { key:"history", label:"History", icon:"📋" },
+    { key:"settings", label:"⚙️", icon:"" },
+  ];
+  const viewerTabs = [
+    { key:"standings", label:"Scores", icon:"📊" },
+    { key:"drafts", label:"Drafts", icon:"👥" },
+    { key:"history", label:"History", icon:"📋" },
+    { key:"rules", label:"Rules", icon:"📜" },
+  ];
+  const tabs = IS_ADMIN ? adminTabs : viewerTabs;
+
+  return (
+    <div style={S.container}>
+      {notification && <div style={S.notification}>{notification}</div>}
+      <Header ep={state.currentEpisode} />
+      <div style={S.navBar}>
+        {tabs.map(t=>(
+          <button key={t.key} style={{...S.navBtn,...(activeTab===t.key?S.navBtnActive:{})}}
+            onClick={()=>setActiveTab(t.key)}>
+            {t.icon&&<span style={S.navIcon}>{t.icon}</span>}
+            <span style={S.navLabel}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+      <div style={S.content}>
+        {activeTab==="standings" && <Standings state={state} />}
+        {activeTab==="score" && IS_ADMIN && <ScoreEpisode state={state} save={save} notify={notify} publish={publish} />}
+        {activeTab==="winner" && IS_ADMIN && <WinnerPicks state={state} save={save} notify={notify} publish={publish} />}
+        {activeTab==="drafts" && <DraftView state={state} />}
+        {activeTab==="history" && <EpisodeHistory state={state} />}
+        {activeTab==="rules" && <Rules />}
+        {activeTab==="settings" && IS_ADMIN && <Settings state={state} save={save} notify={notify} publish={publish} />}
+      </div>
+    </div>
+  );
+}
+
+// ─── HEADER ───
+function Header({ep}) {
+  return (
+    <div style={S.header}>
+      <div style={S.headerInner}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:28}}>🔥</span>
+          <div>
+            <div style={S.headerTitle}>SURVIVOR 50</div>
+            <div style={{fontSize:11,color:"#999",letterSpacing:2,textTransform:"uppercase"}}>Fantasy Game</div>
+          </div>
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          {IS_ADMIN && <div style={S.adminBadge}>ADMIN</div>}
+          <div style={S.episodeBadge}>EP {ep}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── SETUP ───
+function SetupScreen({ state, save, notify, publish, draftStep, setDraftStep, notification }) {
+  const [names, setNames] = useState(state.players.map(p=>p.name));
+  const [drafted, setDrafted] = useState(state.players.map(p=>[...(p.drafted||[])]));
+  const [winnerPicks, setWinnerPicks] = useState(state.players.map(p=>p.winnerPick));
+  const allNamed = names.every(n=>n.trim().length>0);
+  const allWinners = winnerPicks.every(w=>w!==null&&w!=="");
+
+  if (draftStep===0) return (
+    <div style={S.container}>
+      {notification&&<div style={S.notification}>{notification}</div>}
+      <div style={S.setupHero}>
+        <div style={S.heroFire}>🔥</div>
+        <h1 style={S.heroTitle}>SURVIVOR 50</h1>
+        <div style={S.heroSubtitle}>FANTASY GAME</div>
+        <div style={S.heroSeason}>In the Hands of the Fans</div>
+      </div>
+      <div style={S.setupCard}>
+        <h2 style={S.setupHeading}>Enter Player Names</h2>
+        <p style={S.setupDesc}>Three players compete all season long.</p>
+        {names.map((n,i)=>(
+          <div key={i} style={S.nameInputRow}>
+            <span style={S.nameLabel}>Player {i+1}</span>
+            <input style={S.nameInput} value={n} placeholder="Enter name..."
+              onChange={e=>{const x=[...names];x[i]=e.target.value;setNames(x)}} />
+          </div>
+        ))}
+        <button style={{...S.primaryBtn,opacity:allNamed?1:0.4}} disabled={!allNamed}
+          onClick={()=>setDraftStep(1)}>Continue to Draft →</button>
+      </div>
+    </div>
+  );
+
+  if (draftStep>=1&&draftStep<=3) {
+    const DS=8, pi=draftStep-1, my=drafted[pi];
+    const taken=drafted.filter((_,i)=>i!==pi).flat();
+    const avail=SURVIVORS.filter(s=>!taken.includes(s.name)&&!my.includes(s.name));
+    return (
+      <div style={S.container}>
+        {notification&&<div style={S.notification}>{notification}</div>}
+        <div style={S.setupHeroSmall}>
+          <h1 style={S.heroTitleSm}>DRAFT — {names[pi]}</h1>
+          <div style={{fontSize:14,color:"#999",marginTop:4}}>Build your team of {DS} Survivors</div>
+          <div style={S.draftCount}>{my.length}/{DS} Selected</div>
+        </div>
+        <div style={S.setupCardWide}>
+          {my.length>0&&<div style={S.draftedPreview}>
+            {my.map(d=>{const s=SURVIVORS.find(x=>x.name===d);return(
+              <div key={d} style={{...S.draftedChip,borderColor:s?.color}}>
+                <span>{d}</span>
+                <button style={S.chipRemove} onClick={()=>{const x=[...drafted];x[pi]=x[pi].filter(n=>n!==d);setDrafted(x)}}>✕</button>
+              </div>
+            )})}
+          </div>}
+          {TRIBES.map(t=>(
+            <div key={t}>
+              <div style={{...S.tribeHeader,color:tc(t)}}><span style={{...S.tribeDot,background:tc(t)}}/>{t} Tribe</div>
+              <div style={S.survivorGrid}>
+                {avail.filter(s=>s.tribe===t).map(s=>{const sel=my.includes(s.name);return(
+                  <button key={s.name} style={{...S.survivorCard,
+                    borderColor:sel?s.color:"rgba(255,255,255,0.08)",background:sel?tb(s.tribe):"rgba(255,255,255,0.03)"}}
+                    onClick={()=>{const x=[...drafted];if(sel)x[pi]=x[pi].filter(n=>n!==s.name);else if(my.length<DS)x[pi]=[...x[pi],s.name];setDrafted(x)}}>
+                    <div style={S.survivorName}>{s.name}</div>
+                    <div style={{fontSize:11,marginTop:2,color:s.color}}>{s.season}</div>
+                  </button>
+                )})}
+              </div>
+            </div>
+          ))}
+          <div style={S.draftNav}>
+            <button style={S.secondaryBtn} onClick={()=>setDraftStep(draftStep-1)}>← Back</button>
+            <button style={{...S.primaryBtn,opacity:my.length===DS?1:0.4,width:"auto",marginTop:0}}
+              disabled={my.length!==DS} onClick={()=>setDraftStep(draftStep+1)}>
+              {draftStep<3?"Next Player →":"Pick Winners →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (draftStep===4) return (
+    <div style={S.container}>
+      {notification&&<div style={S.notification}>{notification}</div>}
+      <div style={S.setupHeroSmall}>
+        <h1 style={S.heroTitleSm}>SOLE SURVIVOR PICKS</h1>
+        <div style={{fontSize:14,color:"#999",marginTop:4}}>Each player picks who wins it all</div>
+      </div>
+      <div style={S.setupCardWide}>
+        {names.map((name,pi)=>(
+          <div key={pi} style={S.winnerSection}>
+            <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 8px",color:"#E8751A"}}>{name}'s Winner Pick</h3>
+            <select style={S.select} value={winnerPicks[pi]||""}
+              onChange={e=>{const x=[...winnerPicks];x[pi]=e.target.value||null;setWinnerPicks(x)}}>
+              <option value="">Select a Survivor...</option>
+              {TRIBES.map(t=>(<optgroup key={t} label={`${t} Tribe`}>
+                {SURVIVORS.filter(s=>s.tribe===t).map(s=><option key={s.name} value={s.name}>{s.name} ({s.season})</option>)}
+              </optgroup>))}
+            </select>
+            {winnerPicks[pi]&&<div style={{...S.winnerChosen,borderColor:SURVIVORS.find(s=>s.name===winnerPicks[pi])?.color}}>⭐ {winnerPicks[pi]}</div>}
+          </div>
+        ))}
+        <div style={S.draftNav}>
+          <button style={S.secondaryBtn} onClick={()=>setDraftStep(3)}>← Back</button>
+          <button style={{...S.primaryBtn,opacity:allWinners?1:0.4,width:"auto",marginTop:0}}
+            disabled={!allWinners} onClick={()=>{
+              const ns={...state,phase:"game",players:state.players.map((p,i)=>({
+                ...p,name:names[i],drafted:drafted[i],winnerPick:winnerPicks[i],winnerHistory:[winnerPicks[i]]}))};
+              save(ns);
+              downloadJSON(ns,"data.json");
+              notify("🔥 Game started! data.json downloaded — commit it to your repo.");
+            }}>🔥 Start Game & Download</button>
+        </div>
+      </div>
+    </div>
+  );
+  return null;
+}
+
+// ─── STANDINGS ───
+function Standings({state}) {
+  const scores=calcScores(state);
+  const sorted=scores.map((s,i)=>({...s,idx:i})).sort((a,b)=>b.total-a.total);
+  const max=Math.max(...sorted.map(s=>s.total),1);
+  const medals=["🥇","🥈","🥉"];
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Leaderboard</h2>
+      {sorted.map((s,r)=>(
+        <div key={s.idx} style={S.standingRow}>
+          <div style={S.standingRank}>{medals[r]||""}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={S.standingName}>{s.name}</div>
+            <div style={S.bar}><div style={{...S.barFill,width:`${(s.total/max)*100}%`}}/></div>
+            <div style={S.breakdown}>
+              <span><span style={S.bl}>Survivor</span> {s.surv}</span>
+              <span><span style={S.bl}>Vote</span> {s.vote}</span>
+              <span><span style={S.bl}>Winner Streak</span> {s.streak}</span>
+            </div>
+          </div>
+          <div style={S.standingTotal}>{s.total}</div>
+        </div>
+      ))}
+      <div style={S.tieInfo}>Tiebreaker: Vote pts → Survivor pts → Bonus pts</div>
+
+      <h2 style={{...S.sectionTitle,marginTop:28}}>Teams</h2>
+      {state.players.map((p,i)=>(
+        <div key={i} style={S.card}>
+          <div style={{fontWeight:700,fontSize:15,marginBottom:6}}>{p.name}</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {(p.drafted||[]).map(d=>{const s=SURVIVORS.find(x=>x.name===d);const el=(state.eliminatedSurvivors||[]).includes(d);
+              return <span key={d} style={{...S.tag,borderColor:s?.color,opacity:el?0.4:1,textDecoration:el?"line-through":"none"}}>{d}</span>})}
+            <span style={S.winnerTag}>⭐ {p.winnerPick}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── SCORE EPISODE (admin only) ───
+function ScoreEpisode({state, save, notify, publish}) {
+  const {currentEpisode:ep, eliminatedSurvivors:elim} = state;
+  const active=SURVIVORS.filter(s=>!(elim||[]).includes(s.name));
+  const [step,setStep]=useState(0);
+  const [votedOut,setVotedOut]=useState([]);
+  const [rewardTribes,setRT]=useState([]);
+  const [rewardInd,setRI]=useState([]);
+  const [rewardShared,setRS]=useState([]);
+  const [immunityTribes,setIT]=useState([]);
+  const [immunityInd,setII]=useState([]);
+  const [isIR,setIsIR]=useState(false);
+  const [isII,setIsII]=useState(false);
+  const [indE,setIndE]=useState({});
+  const [votes,setVotes]=useState(state.players.map(()=>({})));
+
+  const ga=t=>active.filter(s=>s.tribe===t);
+  const tgl=(l,sl,v)=>sl(p=>p.includes(v)?p.filter(x=>x!==v):[...p,v]);
+  const tglVO=n=>setVotedOut(p=>p.includes(n)?p.filter(x=>x!==n):[...p,n]);
+  const tglInd=(n,k)=>setIndE(p=>{const e=p[n]||{};return{...p,[n]:{...e,[k]:!e[k]}}});
+  const setVA=(pi,n,v)=>setVotes(p=>{const x=[...p];x[pi]={...x[pi],[n]:Math.max(0,Math.min(10,parseInt(v)||0))};return x});
+  const vtot=pi=>Object.values(votes[pi]).reduce((a,b)=>a+b,0);
+
+  const buildEv=()=>{
+    const ev={};const add=(n,k)=>{if(!ev[n])ev[n]={};ev[n][k]=(ev[n][k]||0)+1};
+    if(!isIR)rewardTribes.forEach(t=>ga(t).forEach(s=>add(s.name,"reward")));
+    rewardInd.forEach(n=>add(n,"reward")); rewardShared.forEach(n=>add(n,"reward"));
+    if(!isII)immunityTribes.forEach(t=>ga(t).forEach(s=>add(s.name,"immunity")));
+    immunityInd.forEach(n=>add(n,"immunity"));
+    Object.entries(indE).forEach(([n,e])=>Object.entries(e).forEach(([k,v])=>{if(v)add(n,k)}));
+    return ev;
+  };
+
+  const submit=()=>{
+    for(let i=0;i<state.players.length;i++){if(vtot(i)>MAX_VOTE_POINTS){notify(`${state.players[i].name} over ${MAX_VOTE_POINTS} vote pts!`);return;}}
+    const events=buildEv();
+    const episode={number:ep,events,votes:votes.map(v=>({...v})),votedOut:[...votedOut]};
+    const ne={...(state.eliminationEpisodes||{})};
+    votedOut.forEach(n=>{if(!ne[n])ne[n]=ep});
+    const ns={...state,
+      episodes:[...(state.episodes||[]),episode],
+      currentEpisode:ep+1,
+      eliminatedSurvivors:[...new Set([...(elim||[]),...votedOut])],
+      eliminationEpisodes:ne,
+      players:state.players.map(p=>({...p,winnerHistory:[...(p.winnerHistory||[]),p.winnerPick]})),
+    };
+    save(ns);
+    downloadJSON(ns,"data.json");
+    notify(`🔥 Episode ${ep} scored! data.json downloaded.`);
+    setStep(0);
+  };
+
+  const labels=["Challenges","Events","Voted Out","Vote Pts","Review"];
+  const Nav=()=>(
+    <div style={S.draftNav}>
+      <button style={S.secondaryBtn} onClick={()=>setStep(step-1)} disabled={step===0}>← Back</button>
+      {step<labels.length-1
+        ?<button style={{...S.primaryBtn,width:"auto",marginTop:0}} onClick={()=>setStep(step+1)}>Next →</button>
+        :<button style={{...S.submitBtn,marginTop:0}} onClick={submit}>🔥 Submit & Download</button>}
+    </div>
+  );
+
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Score Episode {ep}</h2>
+      <div style={S.progressWrap}>
+        <div style={S.progressBar}>
+          {labels.map((l,i)=>(
+            <button key={i} onClick={()=>setStep(i)} style={{...S.progressStep,
+              background:i<=step?"#E8751A":"rgba(255,255,255,0.08)",
+              color:i<=step?"#fff":"#666",border:i===step?"2px solid #f5a623":"2px solid transparent"}}>{i+1}</button>
+          ))}
+        </div>
+        <div style={S.progressLabel}>{labels[step]}</div>
+      </div>
+
+      {/* Step 0: Challenges */}
+      {step===0&&(<div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>🏆 Reward Challenge</h3>
+          <div style={S.toggleRow}>
+            <button style={{...S.toggleBtn,...(!isIR?S.toggleActive:{})}} onClick={()=>{setIsIR(false);setRI([])}}>Tribal</button>
+            <button style={{...S.toggleBtn,...(isIR?S.toggleActive:{})}} onClick={()=>{setIsIR(true);setRT([])}}>Individual</button>
+            <button style={S.toggleSkip} onClick={()=>{setIsIR(false);setRT([]);setRI([]);setRS([])}}>None</button>
+          </div>
+          {!isIR?(<div>
+            <p style={S.desc}>Which tribe(s) won? (+1 all members)</p>
+            <div style={S.tribeBtnRow}>{TRIBES.map(t=>{const a=rewardTribes.includes(t);return(
+              <button key={t} style={{...S.tribeBtn,borderColor:a?tc(t):"rgba(255,255,255,0.08)",background:a?tb(t):"transparent",color:a?tc(t):"#888"}}
+                onClick={()=>tgl(rewardTribes,setRT,t)}><span style={{...S.tribeDot,background:tc(t)}}/>{t}</button>
+            )})}</div>
+          </div>):(<div>
+            <p style={S.desc}>Who won? (+1)</p>
+            <div style={S.qpGrid}>{active.map(s=>(
+              <button key={s.name} style={{...S.qpBtn,borderColor:rewardInd.includes(s.name)?s.color:"rgba(255,255,255,0.08)",
+                background:rewardInd.includes(s.name)?tb(s.tribe):"transparent"}}
+                onClick={()=>tgl(rewardInd,setRI,s.name)}>
+                <span style={{...S.dot,background:s.color}}/>{s.name.split(" ")[0]}
+              </button>
+            ))}</div>
+          </div>)}
+          {(rewardTribes.length>0||rewardInd.length>0)&&(<div style={{marginTop:12}}>
+            <p style={S.desc}>Shared reward? (+1 each)</p>
+            <div style={S.qpGrid}>{active.filter(s=>!rewardInd.includes(s.name)&&!rewardTribes.includes(s.tribe)).map(s=>(
+              <button key={s.name} style={{...S.qpBtn,borderColor:rewardShared.includes(s.name)?s.color:"rgba(255,255,255,0.08)",
+                background:rewardShared.includes(s.name)?tb(s.tribe):"transparent"}}
+                onClick={()=>tgl(rewardShared,setRS,s.name)}>
+                <span style={{...S.dot,background:s.color}}/>{s.name.split(" ")[0]}
+              </button>
+            ))}</div>
+          </div>)}
+        </div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>🛡️ Immunity Challenge</h3>
+          <div style={S.toggleRow}>
+            <button style={{...S.toggleBtn,...(!isII?S.toggleActive:{})}} onClick={()=>{setIsII(false);setII([])}}>Tribal</button>
+            <button style={{...S.toggleBtn,...(isII?S.toggleActive:{})}} onClick={()=>{setIsII(true);setIT([])}}>Individual</button>
+          </div>
+          {!isII?(<div>
+            <p style={S.desc}>Which tribe(s) won? (+2 all members)</p>
+            <div style={S.tribeBtnRow}>{TRIBES.map(t=>{const a=immunityTribes.includes(t);return(
+              <button key={t} style={{...S.tribeBtn,borderColor:a?tc(t):"rgba(255,255,255,0.08)",background:a?tb(t):"transparent",color:a?tc(t):"#888"}}
+                onClick={()=>tgl(immunityTribes,setIT,t)}><span style={{...S.tribeDot,background:tc(t)}}/>{t}</button>
+            )})}</div>
+          </div>):(<div>
+            <p style={S.desc}>Who won? (+2)</p>
+            <div style={S.qpGrid}>{active.map(s=>(
+              <button key={s.name} style={{...S.qpBtn,borderColor:immunityInd.includes(s.name)?s.color:"rgba(255,255,255,0.08)",
+                background:immunityInd.includes(s.name)?tb(s.tribe):"transparent"}}
+                onClick={()=>tgl(immunityInd,setII,s.name)}>
+                <span style={{...S.dot,background:s.color}}/>{s.name.split(" ")[0]}
+              </button>
+            ))}</div>
+          </div>)}
+        </div>
+        <Nav/>
+      </div>)}
+
+      {/* Step 1: Events */}
+      {step===1&&(<div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>📺 Episode Events</h3>
+          <p style={S.desc}>Tap events for each survivor. Skip if nothing happened.</p>
+          <div style={{...S.legendGrid,marginBottom:12}}>
+            {INDIVIDUAL_EVENTS.map(se=><div key={se.key} style={S.legendItem}>{se.icon} {se.label} <span style={S.legendPts}>+{se.points}</span></div>)}
+          </div>
+          {TRIBES.map(t=>{const m=ga(t);if(!m.length)return null;return(<div key={t}>
+            <div style={{...S.tribeHeader,color:tc(t),fontSize:14,marginTop:12}}><span style={{...S.tribeDot,background:tc(t)}}/>{t}</div>
+            {m.map(s=>(<div key={s.name} style={S.eventRow}>
+              <div style={S.eventName}>{s.name}</div>
+              <div style={S.eventBtns}>{INDIVIDUAL_EVENTS.map(se=>{const a=indE[s.name]?.[se.key];return(
+                <button key={se.key} title={se.label} style={{...S.eventBtn,background:a?tb(s.tribe):"transparent",borderColor:a?s.color:"rgba(255,255,255,0.06)"}}
+                  onClick={()=>tglInd(s.name,se.key)}><span>{se.icon}</span></button>
+              )})}</div>
+            </div>))}
+          </div>)})}
+        </div>
+        <Nav/>
+      </div>)}
+
+      {/* Step 2: Voted Out */}
+      {step===2&&(<div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>🗳️ Who Was Voted Out?</h3>
+          <p style={S.desc}>Includes voted out, fire challenge loser, quit, medevac.</p>
+          <div style={S.voGrid}>{active.map(s=>(
+            <button key={s.name} style={{...S.voBtn,borderColor:votedOut.includes(s.name)?"#e74c3c":"rgba(255,255,255,0.08)",
+              background:votedOut.includes(s.name)?"rgba(231,76,60,0.15)":"transparent"}}
+              onClick={()=>tglVO(s.name)}>
+              <span style={{...S.dot,background:s.color}}/>
+              <span style={{fontWeight:votedOut.includes(s.name)?700:400,flex:1}}>{s.name}</span>
+              {votedOut.includes(s.name)&&<span style={{color:"#e74c3c"}}>✕</span>}
+            </button>
+          ))}</div>
+        </div>
+        <Nav/>
+      </div>)}
+
+      {/* Step 3: Vote Allocations */}
+      {step===3&&(<div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>🎯 Vote Point Allocations</h3>
+          <p style={S.desc}>Enter each player's predictions (up to {MAX_VOTE_POINTS} pts each). You should have collected these before the episode aired.</p>
+          {state.players.map((p,pi)=>{const t=vtot(pi);const ov=t>MAX_VOTE_POINTS;return(
+            <div key={pi} style={S.voteSection}>
+              <div style={S.voteHeader}>
+                <span style={{fontWeight:700,fontSize:15}}>{p.name}</span>
+                <span style={{fontWeight:700,fontSize:14,color:ov?"#e74c3c":t===MAX_VOTE_POINTS?"#2A9D8F":"#f5a623"}}>{t}/{MAX_VOTE_POINTS}</span>
+              </div>
+              <div style={S.voteGrid}>{active.map(s=>{const isOut=votedOut.includes(s.name);const has=(votes[pi][s.name]||0)>0;return(
+                <div key={s.name} style={{...S.voteRow,background:isOut&&has?"rgba(42,157,143,0.08)":"transparent"}}>
+                  <span style={{fontSize:12,color:isOut?"#e74c3c":"#bbb",textDecoration:isOut?"line-through":"none",display:"flex",alignItems:"center"}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:s.color,display:"inline-block",marginRight:4}}/>{s.name.split(" ")[0]}
+                  </span>
+                  <input type="number" min="0" max="10" style={S.voteInput} value={votes[pi][s.name]||""} placeholder="0"
+                    onChange={e=>setVA(pi,s.name,e.target.value)}/>
+                </div>
+              )})}</div>
+              {ov&&<div style={{color:"#e74c3c",fontSize:12,marginTop:4,fontWeight:600}}>⚠️ Over limit!</div>}
+            </div>
+          )})}
+        </div>
+        <Nav/>
+      </div>)}
+
+      {/* Step 4: Review */}
+      {step===4&&(()=>{const ev=buildEv();return(<div>
+        <div style={S.section}>
+          <h3 style={S.secTitle}>📋 Episode {ep} Summary</h3>
+          <div style={S.reviewBlock}>
+            <div style={S.reviewLabel}>🏆 Reward</div>
+            <div style={S.reviewVal}>{!isIR&&rewardTribes.length?rewardTribes.join(", ")+" (tribal)":rewardInd.length?rewardInd.map(n=>n.split(" ")[0]).join(", "):"None"}{rewardShared.length?` + ${rewardShared.map(n=>n.split(" ")[0]).join(", ")}`:""}</div>
+          </div>
+          <div style={S.reviewBlock}>
+            <div style={S.reviewLabel}>🛡️ Immunity</div>
+            <div style={S.reviewVal}>{!isII&&immunityTribes.length?immunityTribes.join(", ")+" (tribal)":immunityInd.length?immunityInd.map(n=>n.split(" ")[0]).join(", "):"None"}</div>
+          </div>
+          <div style={S.reviewBlock}>
+            <div style={S.reviewLabel}>🗳️ Voted Out</div>
+            <div style={{...S.reviewVal,color:votedOut.length?"#e74c3c":"#666"}}>{votedOut.length?votedOut.join(", "):"Nobody"}</div>
+          </div>
+          <div style={S.reviewBlock}>
+            <div style={S.reviewLabel}>🎯 Vote Results</div>
+            <div style={S.reviewVal}>{state.players.map((p,i)=>{
+              const v=votes[i]||{};const al=Object.entries(v).filter(([,x])=>x>0);
+              const earned=votedOut.reduce((s,vo)=>s+(v[vo]||0),0);
+              return <div key={i} style={{fontSize:13,marginBottom:4}}><strong>{p.name}:</strong>{" "}
+                {al.length?al.map(([n,pts])=>`${n.split(" ")[0]} (${pts})`).join(", "):"None"}
+                {earned>0&&<span style={{color:"#2A9D8F",fontWeight:700}}> → +{earned}!</span>}
+              </div>;
+            })}</div>
+          </div>
+        </div>
+        <Nav/>
+      </div>)})()}
+    </div>
+  );
+}
+
+// ─── WINNER PICKS (admin) ───
+function WinnerPicks({state, save, notify, publish}) {
+  const active=SURVIVORS.filter(s=>!(state.eliminatedSurvivors||[]).includes(s.name));
+  const update=(pi,pick)=>{
+    const ns={...state,players:state.players.map((p,i)=>i===pi?{...p,winnerPick:pick}:p)};
+    save(ns); downloadJSON(ns,"data.json");
+    notify(`⭐ ${state.players[pi].name}'s pick updated. data.json downloaded.`);
+  };
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Sole Survivor Picks</h2>
+      <p style={S.desc}>Change anytime between episodes. Streak resets on change. Max 13 bonus pts at finale.</p>
+      {state.players.map((p,i)=>{
+        let s=0;const h=p.winnerHistory||[];for(let j=h.length-1;j>=0;j--){if(h[j]===p.winnerPick)s++;else break;}
+        return (
+          <div key={i} style={S.card}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <span style={{fontWeight:700,fontSize:16}}>{p.name}</span>
+              <span style={S.streakBadge}>🔥 {s} ep streak</span>
+            </div>
+            <div style={{fontSize:14,color:"#bbb",marginBottom:10}}>Current: <strong>{p.winnerPick||"None"}</strong></div>
+            <select style={S.select} value={p.winnerPick||""} onChange={e=>update(i,e.target.value)}>
+              <option value="">Select...</option>
+              {TRIBES.map(t=><optgroup key={t} label={`${t} Tribe`}>
+                {active.filter(s=>s.tribe===t).map(s=><option key={s.name} value={s.name}>{s.name}</option>)}
+              </optgroup>)}
+            </select>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── DRAFT VIEW ───
+function DraftView({state}) {
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>All Survivors</h2>
+      {TRIBES.map(t=>(
+        <div key={t}>
+          <div style={{...S.tribeHeader,color:tc(t)}}><span style={{...S.tribeDot,background:tc(t)}}/>{t} Tribe</div>
+          <div style={S.draftGrid}>{SURVIVORS.filter(s=>s.tribe===t).map(s=>{
+            const el=(state.eliminatedSurvivors||[]).includes(s.name);
+            const by=state.players.filter(p=>(p.drafted||[]).includes(s.name)).map(p=>p.name);
+            const pk=state.players.filter(p=>p.winnerPick===s.name).map(p=>p.name);
+            return (<div key={s.name} style={{...S.draftCard,opacity:el?0.35:1,borderColor:el?"rgba(255,255,255,0.05)":s.color}}>
+              <div style={{fontSize:13,fontWeight:700,textDecoration:el?"line-through":"none"}}>{s.name}</div>
+              <div style={{fontSize:11,color:"#888",marginTop:2}}>{s.season}</div>
+              {el&&<div style={{fontSize:10,color:"#e74c3c",fontWeight:700,letterSpacing:1,marginTop:4}}>ELIMINATED</div>}
+              {by.length>0&&<div style={{fontSize:10,color:"#2A9D8F",marginTop:4,fontWeight:600}}>Drafted: {by.join(", ")}</div>}
+              {pk.length>0&&<div style={{fontSize:10,color:"#f5a623",marginTop:2,fontWeight:600}}>⭐ {pk.join(", ")}</div>}
+            </div>);
+          })}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── EPISODE HISTORY ───
+function EpisodeHistory({state}) {
+  if(!(state.episodes||[]).length) return <div><h2 style={S.sectionTitle}>Episode History</h2><p style={{color:"#666",fontSize:14,fontStyle:"italic"}}>No episodes scored yet.</p></div>;
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Episode History</h2>
+      {[...(state.episodes||[])].reverse().map(ep=>(
+        <div key={ep.number} style={S.card}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8,marginBottom:8}}>
+            <span style={{fontWeight:800,fontSize:16,color:"#E8751A"}}>Episode {ep.number}</span>
+            {(ep.votedOut||[]).length>0&&<span style={{fontSize:13,color:"#e74c3c",fontWeight:600}}>Out: {ep.votedOut.join(", ")}</span>}
+          </div>
+          {Object.entries(ep.events||{}).map(([surv,evts])=>{
+            const a=Object.entries(evts).filter(([,v])=>v>0);if(!a.length)return null;
+            return <div key={surv} style={{fontSize:12,color:"#bbb",marginBottom:4}}>
+              <span style={{fontWeight:600}}>{surv}:</span>{" "}
+              {a.map(([k])=>{const se=SCORING_EVENTS.find(e=>e.key===k);return <span key={k} style={S.histTag}>{se?.icon} {se?.label}</span>})}
+            </div>;
+          })}
+          <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+            {(state.players||[]).map((p,pi)=>{
+              const v=(ep.votes||{})[pi]||{};const earned=(ep.votedOut||[]).reduce((s,vo)=>s+(v[vo]||0),0);
+              return <div key={pi} style={{display:"flex",justifyContent:"space-between",fontSize:13,padding:"2px 0"}}>
+                <span>{p.name}</span><span style={{color:earned>0?"#2A9D8F":"#666"}}>{earned>0?`+${earned} vote pts`:"0"}</span></div>;
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── RULES ───
+function Rules() {
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Scoring Rules</h2>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 8px"}}>Survivor Points</h3>
+        <p style={{fontSize:13,color:"#888",marginBottom:8}}>Earned by your 8 drafted survivors each episode:</p>
+        {SCORING_EVENTS.map(se=><div key={se.key} style={{fontSize:13,color:"#bbb",paddingLeft:8,marginBottom:2}}>{se.icon} {se.label}: <strong>+{se.points}</strong></div>)}
+      </div>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 8px"}}>Vote Points (0-10)</h3>
+        <p style={{fontSize:13,color:"#888"}}>Each week, distribute up to 10 points on who you think gets voted out. Earn those points if correct.</p>
+      </div>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 8px"}}>Sole Survivor Bonus (0-13)</h3>
+        <p style={{fontSize:13,color:"#888"}}>Pick the season winner. Earn 1 point per consecutive episode you held that pick, counting back from the finale. Max 13 if you never changed.</p>
+      </div>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 8px"}}>Tiebreaker</h3>
+        <p style={{fontSize:13,color:"#888"}}>1st: Most Vote points. 2nd: Most Survivor points. 3rd: Most Bonus points.</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── SETTINGS (admin) ───
+function Settings({state, save, notify, publish}) {
+  const [cu,setCU]=useState(false);
+  const [cr,setCR]=useState(false);
+  return (
+    <div>
+      <h2 style={S.sectionTitle}>Admin Settings</h2>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Download data.json</h3>
+        <p style={S.desc}>Download current game state to commit to your GitHub repo.</p>
+        <button style={S.primaryBtn} onClick={publish}>📥 Download data.json</button>
+      </div>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Undo Last Episode</h3>
+        <p style={S.desc}>Remove the last scored episode.</p>
+        {!cu?<button style={S.dangerBtn} onClick={()=>setCU(true)} disabled={!(state.episodes||[]).length}>Undo Last Episode</button>
+        :<div style={S.confirmRow}><span>Sure?</span>
+          <button style={S.dangerBtn} onClick={()=>{
+            const last=(state.episodes||[]).slice(-1)[0];if(!last)return;
+            const ns={...state,episodes:(state.episodes||[]).slice(0,-1),currentEpisode:state.currentEpisode-1,
+              eliminatedSurvivors:(state.eliminatedSurvivors||[]).filter(s=>!(last.votedOut||[]).includes(s)),
+              eliminationEpisodes:(()=>{const e={...(state.eliminationEpisodes||{})};(last.votedOut||[]).forEach(s=>delete e[s]);return e})(),
+              players:state.players.map(p=>({...p,winnerHistory:(p.winnerHistory||[]).slice(0,-1)}))};
+            save(ns);downloadJSON(ns,"data.json");notify("Undone. data.json downloaded.");setCU(false);
+          }}>Yes</button>
+          <button style={S.secondaryBtn} onClick={()=>setCU(false)}>Cancel</button>
+        </div>}
+      </div>
+      <div style={S.card}>
+        <h3 style={{fontSize:16,fontWeight:700,margin:"0 0 4px"}}>Reset Game</h3>
+        <p style={S.desc}>Clear everything. Cannot undo!</p>
+        {!cr?<button style={S.dangerBtn} onClick={()=>setCR(true)}>Reset Game</button>
+        :<div style={S.confirmRow}><span>Cannot be undone!</span>
+          <button style={S.dangerBtn} onClick={()=>{const ns=DEFAULT();save(ns);downloadJSON(ns,"data.json");notify("Reset. data.json downloaded.");setCR(false)}}>Yes, Reset</button>
+          <button style={S.secondaryBtn} onClick={()=>setCR(false)}>Cancel</button>
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── STYLES ───
+const S={
+  container:{fontFamily:"'Crimson Pro','Georgia',serif",background:"linear-gradient(175deg,#0a0c0f 0%,#111518 40%,#0d1117 100%)",minHeight:"100vh",color:"#e8e0d4",maxWidth:720,margin:"0 auto",position:"relative"},
+  loadingScreen:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100vh",background:"#0a0c0f",fontFamily:"'Crimson Pro',serif"},
+  notification:{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",background:"rgba(42,157,143,0.95)",color:"#fff",padding:"10px 24px",borderRadius:8,zIndex:1000,fontWeight:600,fontSize:14,backdropFilter:"blur(10px)",boxShadow:"0 4px 20px rgba(0,0,0,0.4)",maxWidth:"90%",textAlign:"center"},
+  header:{background:"rgba(0,0,0,0.6)",borderBottom:"1px solid rgba(232,117,26,0.2)",position:"sticky",top:0,zIndex:100,backdropFilter:"blur(12px)"},
+  headerInner:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px"},
+  headerTitle:{fontSize:18,fontWeight:900,letterSpacing:3,color:"#E8751A",fontFamily:"'Cinzel','Crimson Pro',serif"},
+  episodeBadge:{padding:"6px 14px",background:"rgba(232,117,26,0.15)",borderRadius:20,color:"#E8751A",fontWeight:700,fontSize:13,letterSpacing:1},
+  adminBadge:{padding:"4px 10px",background:"rgba(231,76,60,0.15)",borderRadius:12,color:"#e74c3c",fontWeight:700,fontSize:11,letterSpacing:1},
+  navBar:{display:"flex",borderBottom:"1px solid rgba(255,255,255,0.06)",background:"rgba(0,0,0,0.3)",overflowX:"auto"},
+  navBtn:{flex:1,padding:"10px 2px",background:"none",border:"none",color:"#666",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,fontFamily:"inherit",fontSize:10,minWidth:48,borderBottom:"2px solid transparent"},
+  navBtnActive:{color:"#E8751A",borderBottom:"2px solid #E8751A"},
+  navIcon:{fontSize:16},
+  navLabel:{letterSpacing:.5},
+  content:{padding:"16px 14px 80px"},
+  sectionTitle:{fontSize:22,fontWeight:800,margin:"0 0 16px",color:"#e8e0d4",letterSpacing:1,fontFamily:"'Cinzel','Crimson Pro',serif"},
+  setupHero:{textAlign:"center",padding:"60px 20px 40px",background:"radial-gradient(ellipse at center top,rgba(232,117,26,0.12) 0%,transparent 70%)"},
+  heroFire:{fontSize:64,marginBottom:8},
+  heroTitle:{fontSize:48,fontWeight:900,letterSpacing:6,color:"#E8751A",textShadow:"0 0 40px rgba(232,117,26,0.3)",margin:0,fontFamily:"'Cinzel','Crimson Pro',serif"},
+  heroSubtitle:{fontSize:16,letterSpacing:8,color:"#c4b89a",marginTop:4,textTransform:"uppercase"},
+  heroSeason:{fontSize:13,color:"#888",marginTop:8,fontStyle:"italic"},
+  setupHeroSmall:{textAlign:"center",padding:"32px 20px 20px",background:"radial-gradient(ellipse at center top,rgba(232,117,26,0.08) 0%,transparent 70%)"},
+  heroTitleSm:{fontSize:24,fontWeight:800,letterSpacing:4,color:"#E8751A",margin:0,fontFamily:"'Cinzel','Crimson Pro',serif"},
+  setupCard:{margin:"0 16px",padding:24,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12},
+  setupCardWide:{margin:"0 12px",padding:"16px 12px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:12},
+  setupHeading:{fontSize:20,fontWeight:700,margin:"0 0 4px",color:"#e8e0d4"},
+  setupDesc:{fontSize:14,color:"#888",margin:"0 0 20px"},
+  nameInputRow:{display:"flex",alignItems:"center",gap:12,marginBottom:12},
+  nameLabel:{fontSize:13,color:"#999",width:70,flexShrink:0},
+  nameInput:{flex:1,background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,padding:"10px 14px",color:"#e8e0d4",fontSize:16,outline:"none",fontFamily:"inherit"},
+  primaryBtn:{width:"100%",padding:"14px 24px",background:"linear-gradient(135deg,#E8751A 0%,#c45e12 100%)",color:"#fff",border:"none",borderRadius:10,fontSize:16,fontWeight:700,cursor:"pointer",marginTop:16,fontFamily:"inherit",letterSpacing:1},
+  secondaryBtn:{padding:"10px 20px",background:"rgba(255,255,255,0.06)",color:"#ccc",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
+  dangerBtn:{padding:"10px 20px",background:"rgba(231,76,60,0.15)",color:"#e74c3c",border:"1px solid rgba(231,76,60,0.3)",borderRadius:8,fontSize:14,cursor:"pointer",fontFamily:"inherit"},
+  submitBtn:{width:"100%",padding:"16px",background:"linear-gradient(135deg,#E8751A 0%,#c45e12 100%)",color:"#fff",border:"none",borderRadius:10,fontSize:18,fontWeight:800,cursor:"pointer",fontFamily:"inherit",letterSpacing:1,marginTop:8},
+  confirmRow:{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap",fontSize:14,color:"#e74c3c"},
+  card:{padding:14,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,marginBottom:10},
+  section:{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,padding:14,marginBottom:16},
+  secTitle:{fontSize:16,fontWeight:700,margin:"0 0 8px"},
+  desc:{fontSize:13,color:"#888",margin:"0 0 12px"},
+  tag:{padding:"4px 10px",border:"1px solid",borderRadius:6,fontSize:12,fontWeight:500},
+  winnerTag:{padding:"4px 10px",background:"rgba(245,166,35,0.1)",borderRadius:6,fontSize:12,fontWeight:600,color:"#f5a623"},
+  standingRow:{display:"flex",alignItems:"center",gap:12,padding:"14px 12px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:10,marginBottom:8},
+  standingRank:{fontSize:28,width:40,textAlign:"center",flexShrink:0},
+  standingName:{fontSize:17,fontWeight:700,marginBottom:6},
+  bar:{height:6,background:"rgba(255,255,255,0.06)",borderRadius:3,overflow:"hidden",marginBottom:6},
+  barFill:{height:"100%",background:"linear-gradient(90deg,#E8751A,#f5a623)",borderRadius:3,transition:"width 0.5s ease"},
+  breakdown:{display:"flex",flexWrap:"wrap",gap:8,fontSize:11,color:"#888"},
+  bl:{color:"#555"},
+  standingTotal:{fontSize:28,fontWeight:900,color:"#E8751A",width:50,textAlign:"right",flexShrink:0},
+  tieInfo:{fontSize:12,color:"#555",marginTop:12,textAlign:"center",fontStyle:"italic"},
+  draftCount:{display:"inline-block",padding:"6px 16px",background:"rgba(232,117,26,0.15)",borderRadius:20,color:"#E8751A",fontWeight:700,fontSize:14,marginTop:8},
+  draftedPreview:{display:"flex",flexWrap:"wrap",gap:8,marginBottom:16},
+  draftedChip:{display:"flex",alignItems:"center",gap:8,padding:"8px 14px",border:"2px solid",borderRadius:8,fontSize:14,fontWeight:600},
+  chipRemove:{background:"none",border:"none",color:"#e74c3c",cursor:"pointer",fontSize:14,padding:0},
+  tribeHeader:{fontSize:16,fontWeight:700,letterSpacing:2,display:"flex",alignItems:"center",gap:8,marginTop:20,marginBottom:8,textTransform:"uppercase"},
+  tribeDot:{width:10,height:10,borderRadius:"50%",display:"inline-block"},
+  survivorGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:4},
+  survivorCard:{padding:"10px 12px",border:"2px solid",borderRadius:8,cursor:"pointer",textAlign:"left",fontFamily:"inherit",color:"#e8e0d4",background:"transparent"},
+  survivorName:{fontSize:13,fontWeight:600},
+  draftNav:{display:"flex",justifyContent:"space-between",gap:12,marginTop:20},
+  winnerSection:{marginBottom:20,padding:16,background:"rgba(255,255,255,0.02)",borderRadius:10,border:"1px solid rgba(255,255,255,0.06)"},
+  winnerChosen:{marginTop:8,padding:"8px 14px",border:"2px solid",borderRadius:8,fontSize:14,fontWeight:600,display:"inline-block"},
+  select:{width:"100%",padding:"10px 12px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:8,color:"#e8e0d4",fontSize:14,fontFamily:"inherit",outline:"none"},
+  streakBadge:{padding:"4px 10px",background:"rgba(232,117,26,0.12)",borderRadius:12,fontSize:12,color:"#E8751A",fontWeight:600},
+  progressWrap:{textAlign:"center",marginBottom:20},
+  progressBar:{display:"flex",justifyContent:"center",gap:8,marginBottom:6},
+  progressStep:{width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,fontFamily:"inherit",cursor:"pointer"},
+  progressLabel:{fontSize:13,color:"#E8751A",fontWeight:600,letterSpacing:1,textTransform:"uppercase"},
+  toggleRow:{display:"flex",gap:6,marginBottom:12},
+  toggleBtn:{flex:1,padding:"10px 12px",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,color:"#888",cursor:"pointer",fontSize:14,fontWeight:600,fontFamily:"inherit"},
+  toggleActive:{background:"rgba(232,117,26,0.12)",borderColor:"#E8751A",color:"#E8751A"},
+  toggleSkip:{flex:1,padding:"10px 12px",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,color:"#555",cursor:"pointer",fontSize:13,fontFamily:"inherit"},
+  tribeBtnRow:{display:"flex",gap:8},
+  tribeBtn:{flex:1,padding:"14px 10px",border:"2px solid",borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:"transparent"},
+  qpGrid:{display:"flex",flexWrap:"wrap",gap:5},
+  qpBtn:{padding:"7px 11px",border:"2px solid",borderRadius:8,background:"transparent",color:"#e8e0d4",cursor:"pointer",fontSize:13,fontFamily:"inherit",display:"flex",alignItems:"center",gap:5},
+  dot:{width:8,height:8,borderRadius:"50%"},
+  voGrid:{display:"flex",flexDirection:"column",gap:4},
+  voBtn:{padding:"12px 14px",border:"2px solid",borderRadius:10,background:"transparent",color:"#e8e0d4",cursor:"pointer",fontSize:15,fontFamily:"inherit",display:"flex",alignItems:"center",gap:10},
+  voteSection:{marginBottom:16,padding:12,background:"rgba(255,255,255,0.02)",borderRadius:8},
+  voteHeader:{display:"flex",justifyContent:"space-between",marginBottom:8},
+  voteGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4},
+  voteRow:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 8px",borderRadius:6},
+  voteInput:{width:44,padding:"4px 6px",background:"rgba(255,255,255,0.05)",border:"1px solid rgba(255,255,255,0.1)",borderRadius:6,color:"#e8e0d4",fontSize:14,textAlign:"center",fontFamily:"inherit",outline:"none"},
+  eventRow:{padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"},
+  eventName:{fontSize:13,fontWeight:600,marginBottom:6},
+  eventBtns:{display:"flex",flexWrap:"wrap",gap:4},
+  eventBtn:{width:34,height:34,borderRadius:8,border:"1px solid",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,background:"transparent"},
+  legendGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:12,color:"#999"},
+  legendItem:{},
+  legendPts:{color:"#2A9D8F",fontWeight:700},
+  reviewBlock:{padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.06)"},
+  reviewLabel:{fontSize:14,fontWeight:700,marginBottom:4},
+  reviewVal:{fontSize:14,color:"#bbb"},
+  draftGrid:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8},
+  draftCard:{padding:"10px 12px",border:"1px solid",borderRadius:8},
+  histTag:{display:"inline-block",padding:"2px 8px",background:"rgba(255,255,255,0.04)",borderRadius:4,marginLeft:4,fontSize:11},
+};
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>

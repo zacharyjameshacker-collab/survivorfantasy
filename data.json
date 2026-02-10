@@ -1,0 +1,12 @@
+{
+  "phase": "setup",
+  "players": [
+    { "name": "", "drafted": [], "winnerPick": null, "winnerHistory": [] },
+    { "name": "", "drafted": [], "winnerPick": null, "winnerHistory": [] },
+    { "name": "", "drafted": [], "winnerPick": null, "winnerHistory": [] }
+  ],
+  "currentEpisode": 1,
+  "episodes": [],
+  "eliminatedSurvivors": [],
+  "eliminationEpisodes": {}
+}
